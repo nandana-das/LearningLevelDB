@@ -65,9 +65,9 @@ public class LibraryManager {
 
     public static void main(String[] args) {
         // Replace with your details
-        String dbUrl = "jdbc:mysql://localhost:3306/lib_data"; // Replace 'lib_data' with your actual database name
-        String dbUsername = "root";
-        String dbPassword = "Paru007@kunjan";
+        String dbUrl = "databaseurl"; // Replace with your actual database url
+        String dbUsername = "root";//replase with your actual database username
+        String dbPassword = "Password";///replase with your actual database password
 
         try {
             // Create LibraryManager instance in the try block
