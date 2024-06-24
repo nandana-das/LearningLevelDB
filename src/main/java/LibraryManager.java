@@ -35,12 +35,20 @@ public class LibraryManager {
         String sql = "SELECT * FROM lib_data.Books"; // Adjust table name if needed
         ResultSet booksResult = statement.executeQuery(sql);
 
-        while (booksResult.next()) {
+       while (booksResult.next()) {
             int bookId = booksResult.getInt("id");
-            String bookData = "title:" + booksResult.getString("title") + ",author:" + booksResult.getString("author") + ",genre:" + booksResult.getString("genre") + "..."; // Customize data format
+            // Convert row data to HashMap
+            Map<String, String> bookData = new HashMap<>();
+            bookData.put("title", booksResult.getString("title"));
+            bookData.put("author", booksResult.getString("author"));
+            bookData.put("genre", booksResult.getString("genre"));
+            // Add more key-value pairs as needed for other book attributes
 
-            // Serialize data into byte array (adjust based on your data format)
-            byte[] data = bookData.getBytes();
+            // Serialize data into JSON string (or any other format you prefer)
+            String jsonData = convertMapToJson(bookData);
+
+            // Store JSON string in LevelDB
+            byte[] data = jsonData.getBytes();
             levelDb.put(String.valueOf(bookId).getBytes(), data);
         }
 
@@ -55,8 +63,19 @@ public class LibraryManager {
             return null; // Book not found
         }
         // Deserialize data from byte array (adjust based on your data format)
-        return new String(data);
+       String jsonData = new String(data);
+        Map<String, String> bookData = convertJsonToMap(jsonData);
+
+        // Convert book data map to a formatted string for printing
+        StringBuilder details = new StringBuilder();
+        details.append("Book details for ID ").append(bookId).append(":\n");
+        for (Map.Entry<String, String> entry : bookData.entrySet()) {
+            details.append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+        }
+
+        return details.toString();
     }
+
 
     public void close() throws SQLException, IOException {
         connection.close();
@@ -78,8 +97,9 @@ public class LibraryManager {
 
             // Example: Retrieve book details
             int bookId = 1;
-            try {
+           try {
                 String bookData = manager.getBookDetails(bookId);
+                //convert bookData from string to a map then print the values
                 if (bookData != null) {
                     System.out.println("Book details for ID " + bookId + ": " + bookData);
                 } else {
