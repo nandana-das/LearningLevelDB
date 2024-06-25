@@ -6,6 +6,11 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
@@ -75,8 +80,15 @@ public class LibraryManager {
 
         return details.toString();
     }
+    public String convertMapToJson(Map<String, String> map) {
+        Gson gson = new Gson();
+        return gson.toJson(map);
+    }
 
-
+    public Map<String, String> convertJsonToMap(String json) {
+        Gson gson = new Gson();
+        return gson.fromJson(json, new TypeToken<Map<String, String>>(){}.getType());
+    }
     public void close() throws SQLException, IOException {
         connection.close();
         levelDb.close();
@@ -84,9 +96,9 @@ public class LibraryManager {
 
     public static void main(String[] args) {
         // Replace with your details
-        String dbUrl = "databaseurl"; // Replace with your actual database url
-        String dbUsername = "root";//replase with your actual database username
-        String dbPassword = "Password";///replase with your actual database password
+        String dbUrl = "data/base/url"; // Replace with your actual database url
+        String dbUsername = "root";//replace with your actual database username
+        String dbPassword = "Password";///replace with your actual database password
 
         try {
             // Create LibraryManager instance in the try block
