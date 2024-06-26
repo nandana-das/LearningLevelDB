@@ -1,37 +1,35 @@
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+//import java.nio.file.Files;
+//import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+
 import java.util.HashMap;
 import java.util.Map;
+import java.util.scanner;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-import org.iq80.leveldb.DB;
-import org.iq80.leveldb.Options;
-import org.iq80.leveldb.impl.Iq80DBFactory;
+//import org.iq80.leveldb.DB;
+//import org.iq80.leveldb.Options;
+//import org.iq80.leveldb.impl.Iq80DBFactory;
 
 public class LibraryManager {
 
     private Connection connection;
-    private DB levelDb;
-
+    private LRUCache cache;
+    
     public LibraryManager(String dbUrl, String dbUsername, String dbPassword) throws SQLException, IOException {
         // Connect to MySQL database
         connection = DriverManager.getConnection(dbUrl, dbUsername, dbPassword);
 
-        // Create a temporary directory for LevelDB
-        Path tempDir = Files.createTempDirectory("leveldb");
+        // Create LRU cache instance
+        cache = new LRUCache(cacheDir); // 5mins cache expiry
 
-        // Open LevelDB database
-        Options options = new Options();
-        options.createIfMissing(true);
-        levelDb = Iq80DBFactory.factory.open(tempDir.toFile(), options);
     }
     public void storeLibraryData() throws SQLException {
         Statement statement = connection.createStatement();
@@ -52,9 +50,8 @@ public class LibraryManager {
             // Serialize data into JSON string (or any other format you prefer)
             String jsonData = convertMapToJson(bookData);
 
-            // Store JSON string in LevelDB
-            byte[] data = jsonData.getBytes();
-            levelDb.put(String.valueOf(bookId).getBytes(), data);
+            // Add to LRU cache
+            cache.put(String.valueOf(bookId), jsonData, System.currentTimeMillis() +5*60*1000);
         }
 
         // Repeat for Members and Loans tables with appropriate data formatting
@@ -63,23 +60,36 @@ public class LibraryManager {
     }
 
     public String getBookDetails(int bookId) throws Exception {
-        byte[] data = levelDb.get(String.valueOf(bookId).getBytes());
-        if (data == null) {
+        // Check LRU cache first
+        String cachedValue = cache.get(String.valueOf(bookId));
+        if (cachedValue != null) {
+            return cachedValue;
+        }
+
+        // If not found in cache, retrieve from database
+        Statement statement = connection.createStatement();
+        String sql = "SELECT * FROM lib_data.Books WHERE id = " + bookId;
+        ResultSet bookResult = statement.executeQuery(sql);
+
+        if (bookResult.next()) {
+            Map<String, String> bookData = new HashMap<>();
+            bookData.put("title", bookResult.getString("title"));
+            bookData.put("author", bookResult.getString("author"));
+            bookData.put("genre", bookResult.getString("genre"));
+            // Add more key-value pairs as needed for other book attributes
+
+            // Serialize data into JSON string (or any other format you prefer)
+            String jsonData = convertMapToJson(bookData);
+
+            // Add to LRU cache
+            cache.put(String.valueOf(bookId), jsonData, System.currentTimeMillis() + 10000);
+
+            return jsonData;
+        } else {
             return null; // Book not found
         }
-        // Deserialize data from byte array (adjust based on your data format)
-       String jsonData = new String(data);
-        Map<String, String> bookData = convertJsonToMap(jsonData);
-
-        // Convert book data map to a formatted string for printing
-        StringBuilder details = new StringBuilder();
-        details.append("Book details for ID ").append(bookId).append(":\n");
-        for (Map.Entry<String, String> entry : bookData.entrySet()) {
-            details.append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
-        }
-
-        return details.toString();
     }
+
     public String convertMapToJson(Map<String, String> map) {
         Gson gson = new Gson();
         return gson.toJson(map);
@@ -91,7 +101,7 @@ public class LibraryManager {
     }
     public void close() throws SQLException, IOException {
         connection.close();
-        levelDb.close();
+        cache.close();
     }
 
     public static void main(String[] args) {
@@ -107,9 +117,22 @@ public class LibraryManager {
             // Store data from database to LevelDB
             manager.storeLibraryData();
 
-            // Example: Retrieve book details
-            int bookId = 1;
-           try {
+             // Display book names and numbers
+            Statement statement = manager.connection.createStatement();
+            ResultSet booksResult = statement.executeQuery("SELECT id, title FROM lib_data.Books");
+            System.out.println("Book IDs and names:");
+            while (booksResult.next()) {
+                System.out.println("ID: " + booksResult.getInt("id") + ", Name: " + booksResult.getString("title"));
+            }
+            booksResult.close();
+            statement.close();
+
+            // Let the user choose which book they want to see the details of
+            System.out.print("Enter the ID of the book you want to see the details of: ");
+            int bookId = new Scanner(System.in).nextInt();
+
+            // Retrieve book details
+            try {
                 String bookData = manager.getBookDetails(bookId);
                 //convert bookData from string to a map then print the values
                 if (bookData != null) {
