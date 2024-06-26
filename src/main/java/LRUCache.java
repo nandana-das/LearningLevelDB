@@ -9,19 +9,41 @@ import org.iq80.leveldb.impl.Iq80DBFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * An LRU cache implementation using LevelDB.
+ */
 public class LRUCache {
     private DB db;
 
+    /**
+     * Constructs a new LRU cache instance with the given cache directory.
+     *
+     * @param cacheDir the cache directory
+     * @throws IOException if there is an error opening the LevelDB instance
+     */
     public LRUCache(String cacheDir) throws IOException {
         Options options = new Options();
         File file = new File(cacheDir);
         db = Iq80DBFactory.factory.open(file, options);
     }
 
+    /**
+     * Adds a key-value pair to the cache with an expiration time.
+     *
+     * @param key   the key
+     * @param value the value
+     * @param expiryTime the expiration time in milliseconds
+     */
     public void put(String key, String value, long expiryTime) {
         db.put(key.getBytes(), (value + "#" + expiryTime).getBytes());
     }
 
+    /**
+     * Retrieves the value associated with the given key from the cache.
+     *
+     * @param key the key
+     * @return the value associated with the key, or null if the key is not present or the cache entry has expired
+     */
     public String get(String key) {
         byte[] valueBytes = db.get(key.getBytes());
         if (valueBytes != null) {
@@ -50,10 +72,20 @@ public class LRUCache {
         return null;
     }
 
+    /**
+     * Removes the key-value pair associated with the given key from the cache.
+     *
+     * @param key the key
+     */
     public void remove(String key) {
         db.delete(key.getBytes());
     }
 
+    /**
+     * Closes the LevelDB instance and releases any associated resources.
+     *
+     * @throws IOException if there is an error closing the LevelDB instance
+     */
     public void close() throws IOException {
         db.close();
     }
